@@ -78,6 +78,7 @@ public class CloudWatchLogSender : ILogSender
     {
         const int maxBatchCount = 10000;
         const int maxBatchBytes = 1_048_576; // 1MB
+        const int maxEventBytes = 262_144;   // 256KB per event
         const int eventOverhead = 26; // bytes per event overhead
 
         var batches = new List<List<InputLogEvent>>();
@@ -87,6 +88,16 @@ public class CloudWatchLogSender : ILogSender
         foreach (var evt in events)
         {
             var eventSize = System.Text.Encoding.UTF8.GetByteCount(evt.Message) + eventOverhead;
+
+            // Truncate oversized events to 256KB limit
+            if (eventSize > maxEventBytes)
+            {
+                var maxMessageBytes = maxEventBytes - eventOverhead;
+                var truncated = TruncateUtf8(evt.Message, maxMessageBytes);
+                evt.Message = truncated + "... [TRUNCATED]";
+                eventSize = System.Text.Encoding.UTF8.GetByteCount(evt.Message) + eventOverhead;
+                Console.Error.WriteLine("[CloudWatchLogSender] Log event exceeded 256KB limit, truncated");
+            }
 
             if (currentBatch.Count >= maxBatchCount ||
                 (currentBatchSize + eventSize > maxBatchBytes && currentBatch.Count > 0))
@@ -106,5 +117,18 @@ public class CloudWatchLogSender : ILogSender
         }
 
         return batches;
+    }
+
+    private static string TruncateUtf8(string input, int maxBytes)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(input);
+        if (bytes.Length <= maxBytes) return input;
+
+        // Find valid UTF-8 boundary
+        var length = maxBytes;
+        while (length > 0 && (bytes[length] & 0xC0) == 0x80)
+            length--;
+
+        return System.Text.Encoding.UTF8.GetString(bytes, 0, length);
     }
 }

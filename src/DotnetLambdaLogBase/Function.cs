@@ -16,24 +16,30 @@ public class Function
 {
     private readonly ServiceProvider _serviceProvider;
     private readonly ILogger<Function> _logger;
+    private readonly CloudWatchLoggerProvider _loggerProvider;
 
     public Function()
     {
+        var options = new CloudWatchLoggerOptions
+        {
+            AllLogsGroupName = Environment.GetEnvironmentVariable("ALL_LOGS_GROUP")
+                ?? "/lambda/app/all-logs",
+            ErrorLogsGroupName = Environment.GetEnvironmentVariable("ERROR_LOGS_GROUP")
+                ?? "/lambda/shared/error-logs",
+            FunctionName = Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME")
+        };
+
         _serviceProvider = new ServiceCollection()
-            .AddLogging(builder =>
+            .AddLogging(builder => builder.AddCloudWatchLogger(o =>
             {
-                builder.AddCloudWatchLogger(options =>
-                {
-                    options.AllLogsGroupName = Environment.GetEnvironmentVariable("ALL_LOGS_GROUP")
-                        ?? "/lambda/app/all-logs";
-                    options.ErrorLogsGroupName = Environment.GetEnvironmentVariable("ERROR_LOGS_GROUP")
-                        ?? "/lambda/shared/error-logs";
-                    options.FunctionName = Environment.GetEnvironmentVariable("AWS_LAMBDA_FUNCTION_NAME");
-                });
-            })
+                o.AllLogsGroupName = options.AllLogsGroupName;
+                o.ErrorLogsGroupName = options.ErrorLogsGroupName;
+                o.FunctionName = options.FunctionName;
+            }))
             .BuildServiceProvider();
 
         _logger = _serviceProvider.GetRequiredService<ILogger<Function>>();
+        _loggerProvider = (CloudWatchLoggerProvider)_serviceProvider.GetRequiredService<ILoggerProvider>();
     }
 
     /// <summary>
@@ -57,8 +63,8 @@ public class Function
         }
         finally
         {
-            // Ensure logs are flushed before Lambda freezes
-            await _serviceProvider.DisposeAsync();
+            // Flush logs without disposing ServiceProvider (Lambda reuses containers)
+            await _loggerProvider.FlushAsync();
         }
     }
 }
