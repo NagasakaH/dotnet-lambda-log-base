@@ -383,3 +383,8 @@ cd e2e
 ## ライセンス
 
 MIT
+
+## 参考リンク
+
+- [Amazon CloudWatch Pricing](https://aws.amazon.com/cloudwatch/pricing/) — CloudWatch Logs の取り込み・保管料金（STANDARD / DELIVERY クラス別）
+- [Log classes - Amazon CloudWatch Logs](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html) — ログクラスごとの機能比較・制約事項
