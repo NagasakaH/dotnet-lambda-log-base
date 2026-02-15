@@ -7,8 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 E2E_DIR="$SCRIPT_DIR"
 TF_DIR="$E2E_DIR"
-APP_NAME="${APP_NAME:-e2e-test-log-base}"
-AWS_REGION="${AWS_REGION:-us-east-1}"
+TIMESTAMP=$(date +%Y%m%d%H%M)
+APP_NAME="${APP_NAME:-e2e-${TIMESTAMP}}"
+AWS_REGION="${AWS_REGION:-ap-northeast-1}"
 
 # Colors
 RED='\033[0;31m'
@@ -377,6 +378,13 @@ cleanup() {
   echo ""
   echo "=== N5: Terraform destroy cleanup ==="
   cd "$TF_DIR"
+  # S3バケットを空にしてからdestroyする（BucketNotEmpty回避）
+  local bucket_name
+  bucket_name=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+  if [ -n "$bucket_name" ]; then
+    echo "       S3バケットを空にしています: ${bucket_name}"
+    aws s3 rm "s3://${bucket_name}" --recursive --region "$AWS_REGION" 2>&1 || true
+  fi
   if terraform destroy -auto-approve \
     -var="app_name=${APP_NAME}" \
     -var="aws_region=${AWS_REGION}" \
