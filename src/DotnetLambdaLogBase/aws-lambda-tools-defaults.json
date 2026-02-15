@@ -1,0 +1,14 @@
+{
+  "Information": [
+    "This file provides default values for the deployment wizard inside Visual Studio and the AWS Toolkit for VS Code."
+  ],
+  "profile": "",
+  "region": "ap-northeast-1",
+  "configuration": "Release",
+  "function-runtime": "dotnet8",
+  "function-memory-size": 256,
+  "function-timeout": 30,
+  "function-handler": "DotnetLambdaLogBase::DotnetLambdaLogBase.Function::FunctionHandler",
+  "function-architecture": "x86_64",
+  "framework": "net8.0"
+}
