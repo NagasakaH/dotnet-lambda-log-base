@@ -245,6 +245,46 @@ CloudWatch Logs の API 制限に自動対応しています。
 - Metric Filter / Subscription Filter は使用不可
 - **S3 への自動配信** が主な用途
 
+## E2E テスト結果
+
+E2E テストは `e2e/` ディレクトリに含まれています。実際の AWS 環境に対して Terraform apply → Lambda デプロイ → テスト実行 → Terraform destroy を行います。
+
+### 実行方法
+
+```bash
+cd e2e
+./run-e2e-tests.sh
+```
+
+### テスト結果サマリー（2026-02-15）
+
+#### 機能要件テスト
+
+| テストID | テスト名 | 結果 |
+|----------|----------|------|
+| F1 | Terraform apply 正常完了 | ✅ PASS |
+| F2 | Lambda デプロイ＆正常実行 | ✅ PASS |
+| F3 | all-logs ログストリーム作成 | ✅ PASS |
+| F4 | error-logs ログストリーム作成 | ✅ PASS |
+| F5 | JSON構造化ログ形式 | ✅ PASS |
+| F6 | ログストリーム命名規則 | ✅ PASS |
+| F7 | Metric Filter 動作確認 | ✅ PASS |
+| F8 | 異常終了時のログFlush | ✅ PASS |
+
+#### 非機能要件テスト
+
+| テストID | テスト名 | 結果 |
+|----------|----------|------|
+| N1 | S3バケット暗号化（AES256） | ✅ PASS |
+| N2 | S3パブリックアクセスブロック | ✅ PASS |
+| N3 | S3ライフサイクル設定 | ✅ PASS |
+| N4 | S3ログ配信パス確認 | ✅ PASS |
+| N5 | Terraform destroy クリーンアップ | ✅ PASS |
+
+**合計: PASS 13 / FAIL 0**
+
+詳細は [`e2e/test-report.md`](e2e/test-report.md) を参照してください。
+
 ## ライセンス
 
 MIT

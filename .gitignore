@@ -14,3 +14,11 @@ obj/
 ## IDE
 .idea/
 .vscode/
+
+# E2E test artifacts
+e2e/publish/
+e2e/lambda.zip
+e2e/.terraform/
+e2e/.terraform.lock.hcl
+e2e/terraform.tfstate
+e2e/terraform.tfstate.backup
