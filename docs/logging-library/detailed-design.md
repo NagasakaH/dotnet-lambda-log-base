@@ -60,7 +60,7 @@ classDiagram
         -_formatter: ILogFormatter
         +SendAsync(entries, logGroupName, logStreamName, ct) Task
         +EnsureLogStreamExistsAsync(logGroupName, logStreamName, ct) Task
-        -SplitIntoBatches(events) List~List~InputLogEvent~~$
+        -SplitIntoBatches(events) List~List~InputLogEvent~~~$
         -TruncateUtf8(input, maxBytes) string$
     }
 

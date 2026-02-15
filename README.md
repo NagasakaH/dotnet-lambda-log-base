@@ -47,7 +47,7 @@ graph TB
     subgraph CloudWatch["CloudWatch Logs"]
         ALG["📋 all-logs<br/>DELIVERY class<br/>保持: 2日固定"]
         ELG["📋 error-logs<br/>STANDARD class<br/>保持: 7日（設定可）"]
-        MF["Metric Filter<br/>Error | Critical"]
+        MF["Metric Filter<br/>Error / Critical"]
         ALM["⏰ CloudWatch Alarm<br/>ErrorCount > 0"]
     end
 
