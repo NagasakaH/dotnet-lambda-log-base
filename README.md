@@ -34,6 +34,77 @@ Lambda Function
 - **DELIVERY class**: 低コストで大量ログの配信に最適。GetLogEvents / FilterLogEvents は使用不可
 - **STANDARD class**: Metric Filter・Subscription Filter・GetLogEvents に対応
 
+### Terraform インフラ構成
+
+以下の Mermaid 図は `terraform/` で構築される AWS リソースの全体像です。
+
+```mermaid
+graph TB
+    subgraph Lambda["Lambda Function"]
+        FN["Lambda 関数<br/>.NET 8"]
+    end
+
+    subgraph CloudWatch["CloudWatch Logs"]
+        ALG["📋 all-logs<br/>DELIVERY class<br/>保持: 2日固定"]
+        ELG["📋 error-logs<br/>STANDARD class<br/>保持: 7日（設定可）"]
+        MF["Metric Filter<br/>Error | Critical"]
+        ALM["⏰ CloudWatch Alarm<br/>ErrorCount > 0"]
+    end
+
+    subgraph Storage["S3"]
+        S3["🪣 S3 Bucket<br/>AES256 暗号化<br/>パブリックアクセス禁止"]
+        LC["Lifecycle<br/>30日→GLACIER<br/>365日→削除"]
+    end
+
+    subgraph Notification["SNS（条件付き）"]
+        SNS["📧 SNS Topic<br/>※ alarm_email 設定時のみ"]
+    end
+
+    subgraph IAM["IAM"]
+        ROLE["IAM Role<br/>CWL → S3 配信用"]
+    end
+
+    FN -->|"PutLogEvents<br/>全レベル"| ALG
+    FN -->|"PutLogEvents<br/>Error+"| ELG
+    ALG -->|"Subscription Filter"| S3
+    ALG -.->|"配信権限"| ROLE
+    ROLE -.->|"s3:PutObject"| S3
+    S3 --- LC
+    ELG --> MF
+    MF --> ALM
+    ALM -->|"alarm_email≠''"| SNS
+
+    classDef billing fill:#fff3e0,stroke:#e65100
+    classDef free fill:#e8f5e9,stroke:#2e7d32
+    classDef conditional fill:#e3f2fd,stroke:#1565c0
+
+    class ALG,ELG,S3,ALM billing
+    class MF,ROLE free
+    class SNS conditional
+```
+
+> 💡 **凡例**: 🟠オレンジ = 課金対象、🟢緑 = 無料、🔵青 = 条件付き課金
+
+### AWS 課金要素
+
+| サービス | Terraform リソース | 課金モデル | 無料枠 | コスト目安 |
+|---|---|---|---|---|
+| **CloudWatch Logs（取り込み）** | `aws_cloudwatch_log_group.all_logs` / `error_logs` | 従量課金: $0.50/GB（取り込み） | 5GB/月（常に無料枠内） | ログ量に依存 |
+| **CloudWatch Logs（保管）** | 同上 | 従量課金: $0.03/GB/月 | 5GB/月 | DELIVERY=2日固定、STANDARD=設定値 |
+| **S3（ストレージ）** | `aws_s3_bucket.log_delivery` | 従量課金: ~$0.025/GB/月（S3 Standard） | 5GB/月（12ヶ月間） | 30日後 GLACIER ($0.004/GB) |
+| **S3（PUT リクエスト）** | 同上 | $0.005/1,000リクエスト | 2,000リクエスト/月 | 配信頻度に依存 |
+| **CloudWatch Alarm** | `aws_cloudwatch_metric_alarm.error_alarm` | 固定: $0.10/アラーム/月 | 10アラーム | $0.10/月 |
+| **CloudWatch Metric Filter** | `aws_cloudwatch_log_metric_filter.error_count` | **無料** | — | $0 |
+| **SNS（通知）** | `aws_sns_topic.alarm` | 従量: $0.50/100,000 通知（Email） | 1,000通知/月 | alarm_email 未設定時は $0 |
+| **Subscription Filter** | `aws_cloudwatch_log_subscription_filter.s3_delivery` | **無料** | — | $0 |
+| **IAM Role / Policy** | `aws_iam_role.cwl_to_s3` | **無料** | — | $0 |
+
+> 💡 **コスト最適化のポイント**:
+> - **DELIVERY class** を使用することで、CloudWatch Logs の保管コストを最小化（2日固定で自動削除）
+> - S3 Lifecycle で **30日後に GLACIER** へ移行し、ストレージコストを約 85% 削減
+> - SNS は `alarm_email` を設定しなければ作成されない（条件付きリソース）
+> - 小〜中規模の Lambda であれば、**無料枠内で運用可能**
+
 ### ログストリーム命名規則
 
 ```
@@ -76,11 +147,23 @@ dotnet-lambda-log-base/
 │       ├── CloudWatchLoggerProviderTests.cs
 │       └── SanityTests.cs
 │
+├── docs/
+│   └── logging-library/                       # ログライブラリドキュメント
+│       ├── requirements.md                    #   要件定義
+│       ├── basic-design.md                    #   基本設計
+│       └── detailed-design.md                 #   詳細設計
+│
+├── e2e/                                       # E2E テスト
+│   ├── main.tf                                #   テスト用 Terraform
+│   ├── run-e2e-tests.sh                       #   テスト実行スクリプト
+│   └── test-report.md                         #   テスト結果レポート
+│
 └── terraform/                                 # インフラ定義
     ├── providers.tf                           #   AWS プロバイダー設定
     ├── variables.tf                           #   変数定義
     ├── cloudwatch.tf                          #   ロググループ・アラーム
     ├── s3.tf                                  #   ログ保管バケット
+    ├── s3_delivery.tf                         #   CWL→S3 配信（IAM + Filter）
     ├── sns.tf                                 #   アラーム通知
     └── outputs.tf                             #   出力値
 ```
@@ -284,6 +367,16 @@ cd e2e
 **合計: PASS 13 / FAIL 0**
 
 詳細は [`e2e/test-report.md`](e2e/test-report.md) を参照してください。
+
+## ドキュメント
+
+ログライブラリの詳細設計ドキュメントは [`docs/logging-library/`](docs/logging-library/) にあります。
+
+| ドキュメント | 内容 |
+|---|---|
+| [要件定義](docs/logging-library/requirements.md) | 背景・課題・機能/非機能要件・受け入れ条件 |
+| [基本設計](docs/logging-library/basic-design.md) | アーキテクチャ・コンポーネント構成・DI設計 |
+| [詳細設計](docs/logging-library/detailed-design.md) | クラス設計・API リファレンス・処理フロー |
 
 ## ライセンス
 
