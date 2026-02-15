@@ -16,7 +16,7 @@ provider "aws" {
 variable "aws_region" {
   description = "AWS region"
   type        = string
-  default     = "us-east-1"
+  default     = "ap-northeast-1"
 }
 
 variable "app_name" {
@@ -57,6 +57,10 @@ resource "aws_cloudwatch_log_group" "all_logs" {
   name            = "/lambda/${var.app_name}/all-logs"
   log_group_class = "DELIVERY"
   skip_destroy    = false
+
+  lifecycle {
+    ignore_changes = [retention_in_days]
+  }
 
   tags = merge(var.tags, {
     Purpose = "all-logs"
