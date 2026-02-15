@@ -64,13 +64,13 @@ public class LogBufferTests
     }
 
     [Fact]
-    public void Add_ConcurrentAccess_NoDataCorruption()
+    public async Task Add_ConcurrentAccess_NoDataCorruption()
     {
         var buffer = new LogBuffer(10000);
         var tasks = Enumerable.Range(0, 100)
             .Select(i => Task.Run(() => buffer.Add(CreateEntry($"msg{i}"))))
             .ToArray();
-        Task.WaitAll(tasks);
+        await Task.WhenAll(tasks);
 
         Assert.Equal(100, buffer.Count);
     }
