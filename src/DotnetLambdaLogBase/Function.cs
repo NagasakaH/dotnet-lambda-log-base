@@ -51,7 +51,12 @@ public class Function
         {
             _logger.LogInformation("Processing request: {RequestId}", context.AwsRequestId);
 
-            // TODO: Implement business logic here
+            // E2E test support: throw on specific input to verify error log flush
+            var inputStr = input?.ToString() ?? "";
+            if (inputStr.Contains("TRIGGER_ERROR"))
+            {
+                throw new InvalidOperationException("E2E test: intentional error triggered");
+            }
 
             _logger.LogInformation("Request completed: {RequestId}", context.AwsRequestId);
             return "OK";
